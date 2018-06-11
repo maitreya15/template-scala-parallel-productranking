@@ -1,11 +1,11 @@
 package org.template.productranking
 
-import io.prediction.controller.PDataSource
-import io.prediction.controller.EmptyEvaluationInfo
-import io.prediction.controller.EmptyActualResult
-import io.prediction.controller.Params
-import io.prediction.data.storage.Event
-import io.prediction.data.store.PEventStore
+import import org.apache.predictionio.controller.PDataSource
+import import org.apache.predictionio.controller.EmptyEvaluationInfo
+import import org.apache.predictionio.controller.EmptyActualResult
+import import org.apache.predictionio.controller.Params
+import import org.apache.predictionio.data.storage.Event
+import import org.apache.predictionio.data.store.PEventStore
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -87,10 +87,39 @@ class DataSource(val dsp: DataSourceParams)
         viewEvent
       }.cache()
 
+    
+          // get all "user" "play" "item" events
+      val playEventsRDD: RDD[PlayEvent] = PEventStore.find(
+        appName = dsp.appName,
+        entityType = Some("user"),
+        eventNames = Some(List("play")),
+        // targetEntityType is optional field of an event.
+        targetEntityType = Some(Some("item")))(sc)
+        // eventsDb.find() returns RDD[Event]
+        .map { event =>
+          val playEvent = try {
+            event.event match {
+              case "play" => PlayEvent(
+                user = event.entityId,
+                item = event.targetEntityId.get,
+                t = event.eventTime.getMillis)
+              case _ => throw new Exception(s"Unexpected event ${event} is read.")
+            }
+          } catch {
+            case e: Exception => {
+              logger.error(s"Cannot convert ${event} to PlayEvent." +
+                s" Exception: ${e}.")
+              throw e
+            }
+          }
+          playEvent
+        }.cache()
+    
     new TrainingData(
       users = usersRDD,
       items = itemsRDD,
-      viewEvents = viewEventsRDD
+      viewEvents = viewEventsRDD,
+      playEvents = playEventsRDD
     )
   }
 }
@@ -101,14 +130,18 @@ case class Item()
 
 case class ViewEvent(user: String, item: String, t: Long)
 
+case class PlayEvent(user: String, item: String, t: Long)
+
 class TrainingData(
   val users: RDD[(String, User)],
   val items: RDD[(String, Item)],
-  val viewEvents: RDD[ViewEvent]
+  val viewEvents: RDD[ViewEvent],
+  val playEvents: RDD[PlayEvent]
 ) extends Serializable {
   override def toString = {
     s"users: [${users.count()} (${users.take(2).toList}...)]" +
     s"items: [${items.count()} (${items.take(2).toList}...)]" +
-    s"viewEvents: [${viewEvents.count()}] (${viewEvents.take(2).toList}...)"
+    s"viewEvents: [${viewEvents.count()}] (${viewEvents.take(2).toList}...)"+
+    s"playEvents: [${playEvents.count()}] (${playEvents.take(2).toList}...)"
   }
 }
