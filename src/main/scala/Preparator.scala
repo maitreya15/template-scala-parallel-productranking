@@ -1,6 +1,6 @@
 package org.template.productranking
 
-import io.prediction.controller.PPreparator
+import org.apache.predictionio.controller.PPreparator
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -13,12 +13,14 @@ class Preparator
     new PreparedData(
       users = trainingData.users,
       items = trainingData.items,
-      viewEvents = trainingData.viewEvents)
+      viewEvents = trainingData.viewEvents,
+      playEvents = trainingData.playEvents)
   }
 }
 
 class PreparedData(
   val users: RDD[(String, User)],
   val items: RDD[(String, Item)],
-  val viewEvents: RDD[ViewEvent]
+  val viewEvents: RDD[ViewEvent],
+  val playEvents: RDD[ViewEvent]
 ) extends Serializable
